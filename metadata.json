@@ -1,0 +1,8 @@
+{
+  "name": "Remix GQueues Workspace Manager",
+  "description": "Full-featured Google Workspace task manager and project queue with real-time Google Tasks, Calendar, Drive attachments, and contact delegation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
