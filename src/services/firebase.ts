@@ -228,91 +228,6 @@ export const ensureGISLoaded = (): Promise<boolean> => {
   });
 };
 
-let silentRefreshPromise: Promise<string | null> | null = null;
-
-/**
- * Attempts silent token refresh via Google Identity Services without showing a popup.
- * If user has granted permissions before in this browser session, GIS returns a new access_token immediately.
- */
-export const refreshAccessTokenSilently = async (): Promise<string | null> => {
-  if (silentRefreshPromise) {
-    return silentRefreshPromise;
-  }
-
-  silentRefreshPromise = (async () => {
-    try {
-      const loaded = await ensureGISLoaded();
-      if (!loaded) return null;
-
-      const googleObj = (window as any).google;
-      if (!googleObj?.accounts?.oauth2) return null;
-
-      const emailHint = cachedCustomUser?.email || auth.currentUser?.email || '';
-
-      return await new Promise<string | null>((resolve) => {
-        let hasResolved = false;
-        const timer = setTimeout(() => {
-          if (!hasResolved) {
-            hasResolved = true;
-            resolve(null);
-          }
-        }, 8000);
-
-        try {
-          const tokenClient = googleObj.accounts.oauth2.initTokenClient({
-            client_id: firebaseConfig.oAuthClientId,
-            scope: SCOPES.join(' '),
-            hint: emailHint || undefined,
-            callback: (tokenResponse: any) => {
-              if (hasResolved) return;
-              hasResolved = true;
-              clearTimeout(timer);
-
-              if (tokenResponse?.access_token) {
-                const token = tokenResponse.access_token;
-                const expiresIn = Number(tokenResponse.expires_in) || 3500;
-                const user = cachedCustomUser || {
-                  uid: 'workspace-user',
-                  displayName: 'Google Workspace User',
-                  email: emailHint,
-                };
-                saveSession(user, token, expiresIn);
-                console.log('[Auth] Silent token refresh succeeded');
-                resolve(token);
-              } else {
-                console.warn('[Auth] Silent refresh returned no token:', tokenResponse?.error);
-                resolve(null);
-              }
-            },
-            error_callback: (err: any) => {
-              if (hasResolved) return;
-              hasResolved = true;
-              clearTimeout(timer);
-              console.warn('[Auth] Silent refresh error:', err);
-              resolve(null);
-            },
-          });
-
-          // prompt: '' enables silent renewal without opening an interactive popup
-          tokenClient.requestAccessToken({ prompt: '' });
-        } catch (err) {
-          if (!hasResolved) {
-            hasResolved = true;
-            clearTimeout(timer);
-            resolve(null);
-          }
-        }
-      });
-    } catch {
-      return null;
-    } finally {
-      silentRefreshPromise = null;
-    }
-  })();
-
-  return silentRefreshPromise;
-};
-
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
@@ -330,15 +245,8 @@ export const initAuth = (
       if (cachedAccessToken && !isTokenExpired()) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
-        // Attempt silent token refresh via GIS once if previously authorized
-        const silentToken = await refreshAccessTokenSilently();
-        if (silentToken) {
-          cachedAccessToken = silentToken;
-          if (onAuthSuccess) onAuthSuccess(user, silentToken);
-        } else {
-          clearSession();
-          if (onAuthFailure) onAuthFailure();
-        }
+        clearSession();
+        if (onAuthFailure) onAuthFailure();
       }
     } else {
       clearSession();
