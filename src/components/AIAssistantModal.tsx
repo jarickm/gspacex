@@ -15,9 +15,19 @@ import {
   RefreshCw,
   Lightbulb,
   Zap,
+  Settings,
+  Server,
+  Globe,
+  Check,
 } from 'lucide-react';
 import type { GQueueTask, QueueList, CalendarMeeting } from '../types/gqueues';
-import { aiChatAssistant, type AIChatMessage } from '../services/aiApi';
+import {
+  aiChatAssistant,
+  type AIChatMessage,
+  getAiApiBaseUrl,
+  setCustomBackendUrl,
+  DEFAULT_HOSTED_BACKEND_URL,
+} from '../services/aiApi';
 
 interface AIAssistantModalProps {
   isOpen: boolean;
@@ -57,7 +67,57 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [customUrlInput, setCustomUrlInput] = useState(() => {
+    try {
+      return localStorage.getItem('gqueues_backend_api_url') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [backendTestStatus, setBackendTestStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
+  const [backendTestMsg, setBackendTestMsg] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleTestBackend = async (urlToTest?: string) => {
+    setBackendTestStatus('testing');
+    setBackendTestMsg('Connecting to Gemini AI backend...');
+    try {
+      const explicit = urlToTest !== undefined ? urlToTest : customUrlInput;
+      const base = (explicit.trim() || getAiApiBaseUrl() || DEFAULT_HOSTED_BACKEND_URL).replace(/\/+$/, '');
+      const testUrl = base ? `${base}/api/health` : '/api/health';
+      const res = await fetch(testUrl);
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.hasApiKey === false) {
+          setBackendTestStatus('error');
+          setBackendTestMsg(
+            'Server reached, but GEMINI_API_KEY is not set. In Vercel, please add GEMINI_API_KEY under Project Settings > Environment Variables.'
+          );
+        } else {
+          setBackendTestStatus('ok');
+          setBackendTestMsg(`Connected! Gemini AI engine is online (Platform: ${data.platform || 'cloud'}).`);
+        }
+      } else {
+        setBackendTestStatus('error');
+        setBackendTestMsg(`Server returned HTTP ${res.status}. Please check your URL configuration.`);
+      }
+    } catch (err: any) {
+      setBackendTestStatus('error');
+      setBackendTestMsg(`Cannot connect: ${err.message || 'Network error'}. Check URL or CORS.`);
+    }
+  };
+
+  const handleSaveBackendUrl = () => {
+    setCustomBackendUrl(customUrlInput.trim());
+    handleTestBackend(customUrlInput.trim());
+  };
+
+  const handleResetBackendUrl = () => {
+    setCustomUrlInput('');
+    setCustomBackendUrl('');
+    handleTestBackend('');
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -196,13 +256,101 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setShowSettings((prev) => !prev);
+                if (!showSettings && backendTestStatus === 'idle') {
+                  handleTestBackend();
+                }
+              }}
+              className={`p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors cursor-pointer ${
+                showSettings ? 'bg-white/20 text-white' : ''
+              }`}
+              title="Cloud Backend Settings (APK / Vercel / iOS)"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
+
+        {/* Cloud Backend Configuration Drawer (Vercel / APK / iOS) */}
+        {showSettings && (
+          <div className="p-3.5 bg-slate-900 text-slate-100 border-b border-slate-700 text-xs space-y-2.5 animate-in slide-in-from-top-2 duration-150">
+            <div className="flex items-center justify-between">
+              <span className="font-bold flex items-center gap-1.5 text-blue-300">
+                <Server className="w-4 h-4 text-blue-400" />
+                AI Companion Cloud Backend Settings
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {getAiApiBaseUrl() ? 'Custom URL' : 'Auto-Detected'}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              <strong>Vercel:</strong> Uses your deployment's serverless functions. Ensure <code>GEMINI_API_KEY</code> is added to Vercel Project Settings &gt; Environment Variables.
+              <br />
+              <strong>Android APK & iOS:</strong> Enter your live Vercel URL below if you want the app to connect to your personal deployment.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="url"
+                value={customUrlInput}
+                onChange={(e) => setCustomUrlInput(e.target.value)}
+                placeholder="https://your-app.vercel.app (or leave empty for auto)"
+                className="flex-1 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+              />
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleSaveBackendUrl}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Save & Test</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetBackendUrl}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-all cursor-pointer"
+                  title="Reset to default cloud server"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {backendTestStatus !== 'idle' && (
+              <div
+                className={`p-2 rounded-lg text-xs flex items-center gap-2 ${
+                  backendTestStatus === 'ok'
+                    ? 'bg-emerald-950/80 text-emerald-200 border border-emerald-800'
+                    : backendTestStatus === 'testing'
+                    ? 'bg-blue-950/80 text-blue-200 border border-blue-800'
+                    : 'bg-rose-950/80 text-rose-200 border border-rose-800'
+                }`}
+              >
+                {backendTestStatus === 'ok' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                ) : backendTestStatus === 'testing' ? (
+                  <Loader2 className="w-4 h-4 text-blue-400 animate-spin flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                )}
+                <span className="text-[11px] leading-tight">{backendTestMsg}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Quick Context Strip */}
         <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600 overflow-x-auto">

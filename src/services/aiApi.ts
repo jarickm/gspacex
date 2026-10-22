@@ -71,7 +71,7 @@ export interface AIChatResponse {
 
 // Hosted fallback backend service URL (AI Studio Cloud Run production instance)
 export const DEFAULT_HOSTED_BACKEND_URL =
-  'https://ais-dev-cqdgfed6gyikh6c55ssym2-756340359649.asia-northeast1.run.app';
+  'https://ais-pre-cqdgfed6gyikh6c55ssym2-756340359649.asia-northeast1.run.app';
 
 /**
  * Resolves the base URL for AI API endpoints:

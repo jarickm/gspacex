@@ -105,7 +105,7 @@ async function callGemini(prompt: string, options: GeminiCallOptions = {}): Prom
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
   if (!apiKey) {
     throw new Error(
-      'GEMINI_API_KEY is not configured on the server. Please verify your API key in Settings > Secrets.'
+      'GEMINI_API_KEY is not configured on the server. If deployed on Vercel, please add GEMINI_API_KEY under Vercel Project Settings > Environment Variables.'
     );
   }
 

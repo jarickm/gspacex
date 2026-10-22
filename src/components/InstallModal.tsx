@@ -337,58 +337,6 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
                     </p>
                   </div>
                 )}
-
-                {/* AI Companion & Cloud Backend for APK & Vercel */}
-                <div className="p-3.5 bg-blue-50/80 rounded-xl border border-blue-200/80 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
-                      <Server className="w-3.5 h-3.5 text-blue-600" />
-                      <span>AI Companion Cloud Backend (Fixes APK & Vercel 404)</span>
-                    </div>
-                    <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                      CORS & Serverless Ready
-                    </span>
-                  </div>
-
-                  <p className="text-[11px] text-blue-800 leading-relaxed">
-                    <strong>Why 404 happened:</strong> An Android APK runs static files locally on your phone (no Node.js server exists on the device), while Vercel serves static files unless serverless rewrites are active. The app now features <strong>automatic cloud fallback</strong> to ensure your AI Companion works across both!
-                  </p>
-
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
-                    <div className="text-[10px] text-slate-500 font-mono truncate max-w-xs">
-                      Active: {getAiApiBaseUrl() || DEFAULT_HOSTED_BACKEND_URL}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleTestBackend}
-                      disabled={backendTestStatus === 'testing'}
-                      className="w-full sm:w-auto px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-xs font-semibold rounded-lg shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      <Zap className="w-3 h-3" />
-                      <span>{backendTestStatus === 'testing' ? 'Testing...' : 'Test AI Connection'}</span>
-                    </button>
-                  </div>
-
-                  {backendTestStatus !== 'idle' && (
-                    <div
-                      className={`p-2 rounded-lg text-xs flex items-center gap-2 ${
-                        backendTestStatus === 'ok'
-                          ? 'bg-emerald-100/80 text-emerald-900 border border-emerald-200'
-                          : backendTestStatus === 'testing'
-                          ? 'bg-blue-100/80 text-blue-900 border border-blue-200'
-                          : 'bg-rose-100/80 text-rose-900 border border-rose-200'
-                      }`}
-                    >
-                      {backendTestStatus === 'ok' ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                      ) : (
-                        <Info className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
-                      )}
-                      <span className="text-[11px]">{backendTestMsg}</span>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           )}
@@ -576,6 +524,58 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
               </div>
             </div>
           )}
+
+          {/* AI Companion Cloud Backend for Android APK, iOS & Vercel */}
+          <div className="p-3.5 bg-blue-50/80 rounded-xl border border-blue-200/80 space-y-2 mt-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
+                <Server className="w-3.5 h-3.5 text-blue-600" />
+                <span>AI Companion Cloud Backend (Android APK • iOS • Vercel)</span>
+              </div>
+              <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                CORS & Serverless Ready
+              </span>
+            </div>
+
+            <p className="text-[11px] text-blue-800 leading-relaxed">
+              <strong>How it works:</strong> On Vercel, requests are handled by Vercel Serverless Functions with your <code>GEMINI_API_KEY</code>. On Android APKs and iOS WebClips, requests route to the live cloud backend with full CORS support.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+              <div className="text-[10px] text-slate-500 font-mono truncate max-w-xs">
+                Active: {getAiApiBaseUrl() || DEFAULT_HOSTED_BACKEND_URL}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleTestBackend}
+                disabled={backendTestStatus === 'testing'}
+                className="w-full sm:w-auto px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-xs font-semibold rounded-lg shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Zap className="w-3 h-3" />
+                <span>{backendTestStatus === 'testing' ? 'Testing...' : 'Test AI Connection'}</span>
+              </button>
+            </div>
+
+            {backendTestStatus !== 'idle' && (
+              <div
+                className={`p-2 rounded-lg text-xs flex items-center gap-2 ${
+                  backendTestStatus === 'ok'
+                    ? 'bg-emerald-100/80 text-emerald-900 border border-emerald-200'
+                    : backendTestStatus === 'testing'
+                    ? 'bg-blue-100/80 text-blue-900 border border-blue-200'
+                    : 'bg-rose-100/80 text-rose-900 border border-rose-200'
+                }`}
+              >
+                {backendTestStatus === 'ok' ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                ) : (
+                  <Info className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                )}
+                <span className="text-[11px]">{backendTestMsg}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
