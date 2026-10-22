@@ -73,19 +73,39 @@ export interface AIChatResponse {
 export const DEFAULT_HOSTED_BACKEND_URL =
   'https://ais-pre-cqdgfed6gyikh6c55ssym2-756340359649.asia-northeast1.run.app';
 
+// Auto-heal: Purge any invalid/stale backend URLs from localStorage that cause cross-origin Failed to fetch errors
+if (typeof window !== 'undefined') {
+  try {
+    const stored = localStorage.getItem('gqueues_backend_api_url');
+    if (
+      stored &&
+      (stored.includes('run.app') ||
+        stored.includes('localhost:3000') ||
+        stored === window.location.origin)
+    ) {
+      localStorage.removeItem('gqueues_backend_api_url');
+    }
+  } catch {}
+}
+
 /**
  * Resolves the base URL for AI API endpoints:
  * 1. Checks user override stored in localStorage ('gqueues_backend_api_url')
  * 2. Checks build-time environment variables (VITE_BACKEND_URL, VITE_API_URL, VITE_APP_URL)
- * 3. Detects Android APK / Capacitor / Cordova / file / localhost-webview environments and routes to Cloud Run
- * 4. Defaults to relative URL (empty string) for same-origin full-stack deployments
+ * 3. In web browsers (AI Studio, Vercel, Safari, Chrome): always defaults to relative URL ('') for same-origin reliability
+ * 4. In Android APKs / Capacitor / Cordova / file / localhost-webview environments: routes to Cloud Run
  */
 export function getAiApiBaseUrl(): string {
-  // 1. Explicit user override in localStorage
+  // 1. Explicit user override in localStorage (only if different from current origin and not a stale cloud run dev url)
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem('gqueues_backend_api_url');
-      if (stored && stored.trim().startsWith('http')) {
+      if (
+        stored &&
+        stored.trim().startsWith('http') &&
+        !stored.includes('run.app') &&
+        stored.trim() !== window.location.origin
+      ) {
         return stored.trim().replace(/\/+$/, '');
       }
     } catch {}
@@ -113,12 +133,11 @@ export function getAiApiBaseUrl(): string {
       (hostname === 'localhost' && window.location.port !== '3000' && window.location.port !== '');
 
     if (isApkOrStandalone) {
-      // Direct the APK to the hosted cloud backend
       return DEFAULT_HOSTED_BACKEND_URL;
     }
   }
 
-  // 4. Default: relative URL for same-origin server
+  // 4. Default: relative URL for same-origin server (AI Studio, Vercel, iOS Safari, etc.)
   return '';
 }
 
@@ -138,9 +157,7 @@ export function setCustomBackendUrl(url: string): void {
 /**
  * Resilient fetcher for AI endpoints:
  * 1. Queries primary base URL (relative for same-origin, or custom/detected)
- * 2. If 404 occurs (e.g. static Vercel deployment or APK with missing local server),
- *    automatically falls back to DEFAULT_HOSTED_BACKEND_URL and caches the working URL.
- * 3. Catches network drops and retries with cloud backend fallback.
+ * 2. Catches network drops and retries with same-origin or cloud fallback
  */
 async function fetchAiApi<T = any>(endpoint: string, payload: any): Promise<T> {
   const primaryBase = getAiApiBaseUrl();
@@ -154,44 +171,30 @@ async function fetchAiApi<T = any>(endpoint: string, payload: any): Promise<T> {
       body: JSON.stringify(payload),
     });
   } catch (netErr: any) {
-    if (primaryBase !== DEFAULT_HOSTED_BACKEND_URL) {
-      console.warn(`[AI API] Network error calling ${primaryUrl}. Falling back to hosted cloud backend...`, netErr);
-      res = await fetch(`${DEFAULT_HOSTED_BACKEND_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    } else {
-      throw netErr;
-    }
-  }
-
-  // If 404 (common on static Vercel hosting where /api routes do not exist, or on APK local WebView)
-  if (res.status === 404 && primaryBase !== DEFAULT_HOSTED_BACKEND_URL) {
-    console.warn(`[AI API] Endpoint ${primaryUrl} returned 404. Automatically falling back to hosted backend...`);
-    const fallbackRes = await fetch(`${DEFAULT_HOSTED_BACKEND_URL}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (!fallbackRes.ok) {
-      const data = await fallbackRes.json().catch(() => ({}));
-      throw new Error(data.error || `AI request failed (${fallbackRes.status})`);
-    }
-
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('gqueues_backend_api_url', DEFAULT_HOSTED_BACKEND_URL);
+    // If a remote URL failed (e.g. CORS or network drop), retry with relative same-origin if not already tried
+    if (primaryBase !== '') {
+      console.warn(`[AI API] Failed to fetch from ${primaryUrl}. Falling back to relative ${endpoint}...`, netErr);
+      try {
+        res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } catch {
+        throw new Error(
+          `Unable to connect to AI server. If on Android APK, please verify your server URL in AI Settings (⚙️).`
+        );
       }
-    } catch {}
-
-    return fallbackRes.json();
+    } else {
+      throw new Error(
+        `Unable to reach AI server. Please check your internet connection or verify the server status.`
+      );
+    }
   }
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || `AI request failed (${res.status})`);
+    throw new Error(data.error || `AI request failed with HTTP ${res.status}`);
   }
 
   return res.json();

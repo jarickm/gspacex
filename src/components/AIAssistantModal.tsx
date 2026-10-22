@@ -191,7 +191,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
         {
           id: `ai-err-${Date.now()}`,
           role: 'model',
-          text: `⚠️ **AI Engine Error:** ${err.message || 'I encountered an issue connecting to the Gemini AI engine. Please verify your connection or try again.'}`,
+          text: `⚠️ **AI Engine Error:** ${err.message || 'I encountered an issue connecting to the Gemini AI engine. Please verify your connection or try again.'}\n\n*Tip: Click the ⚙️ settings icon in the top header to test your server connection or configure your custom backend URL.*`,
         },
       ]);
     } finally {
